@@ -31,6 +31,9 @@ class Course(db.Model):
     instructor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  
     resources = db.Column(db.Text, nullable=True)  # JSON-struktur med links til videoer/dokumenter
 
+    # Relationship with the User model
+    instructor = db.relationship('User', backref='courses', lazy=True)
+
     # Relation between courses and bookings
     bookings = db.relationship('Booking', backref='course', lazy=True)
 

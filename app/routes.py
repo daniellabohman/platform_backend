@@ -77,27 +77,41 @@ def create_course():
     db.session.commit()
     return jsonify({'message': 'Course created successfully'}), 201
 
-# Get all courses (with optional filtering by category)
+from flask import request, jsonify
+from app.models import Course, Category
+
 @main_routes.route('/courses', methods=['GET'])
 def list_courses():
+    # Get the category filter from the query string
     category = request.args.get('category')
-    
+
     if category:
-        courses = Course.query.filter_by(category_id=category).all()
+        try:
+            category = int(category)  # Ensure category is an integer
+            courses = Course.query.filter_by(category_id=category).all()
+        except ValueError:
+            return jsonify({"error": "Invalid category ID"}), 400
     else:
         courses = Course.query.all()
-    
+
+    # Prepare the list of courses to return
     courses_list = []
     for course in courses:
         courses_list.append({
+            'id': course.id,
             'title': course.title,
             'description': course.description,
             'price': course.price,
-            'category': course.category.name,
-            'instructor': course.instructor.username
+            'category': course.category.name,  # Ensure 'category' relationship is set up in Course model
+            "instructor": {
+                "id": course.instructor.id,
+                "username": course.instructor.username
+            },
         })
-    
+
     return jsonify({'courses': courses_list}), 200
+
+
 
 # Update a course with new resources
 @main_routes.route('/courses/<int:course_id>/add_resources', methods=['POST'])
