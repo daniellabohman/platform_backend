@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from config import Config
 from app.models import db  # Import db from models.py (don't redefine it)
 
@@ -15,6 +16,9 @@ def create_app():
     # Initialize database and migrations
     db.init_app(app)  
     migrate.init_app(app, db)
+
+    # Initialize JWTManager efter app-konfigurationen
+    jwt = JWTManager(app)
 
     # Importing models inside the function to avoid circular imports
     from app.models import User, Course, Booking, Notification, Category, Instructor

@@ -27,11 +27,7 @@ class User(db.Model):
     # Relationships
     bookings = db.relationship('Booking', backref='user', lazy=True)
     invoices = db.relationship('Invoice', backref='user', lazy=True)
-    instructor = db.relationship('Instructor', uselist=False, backref='user', lazy=True)  # One-to-one relation
-
-    # Relationships
-    bookings = db.relationship('Booking', backref='user', lazy=True)
-    invoices = db.relationship('Invoice', backref='user', lazy=True)
+    instructor = db.relationship('Instructor', uselist=False, back_populates='user', lazy=True) # One-to-one relation
 
 #Instruktor model
 class Instructor(db.Model):
@@ -40,7 +36,7 @@ class Instructor(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     bio = db.Column(db.Text, nullable=True)
     expertise = db.Column(db.String(255), nullable=True)
-    user = db.relationship('User', backref='instructor', lazy=True)
+    user = db.relationship('User', foreign_keys=[user_id], back_populates='instructor', lazy=True)
 
 # Profile model for customers and instructors
 class Profile(db.Model):

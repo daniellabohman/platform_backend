@@ -1,10 +1,19 @@
 import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, app
 from flask_login import login_required, current_user
 from app.models import db, User, Course, Booking, Notification, Subscription, Invoice, Category, Profile
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import SQLAlchemyError
-from flask_jwt_extended import create_access_token # type: ignore
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required
+from datetime import timedelta
+from functools import wraps
+from flask import request, jsonify
+from dotenv import load_dotenv
+import os
+import jwt
+
+# Indlæs miljøvariabler fra .env filen
+load_dotenv()
 
 # Create Blueprint for routes
 main_routes = Blueprint('main_routes', __name__)
@@ -16,6 +25,19 @@ def home():
 @main_routes.route('/About', methods=['GET'])
 def about():
     return jsonify({'message': 'Backend is running'}), 200
+
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
+def token_required(f):
+    @wraps(f)
+    @jwt_required()
+    def decorated_function(*args, **kwargs):
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        if current_user is None:
+            return jsonify({'message': 'User not found'}), 404
+        return f(current_user, *args, **kwargs)
+    return decorated_function
 
 # Register a new user 
 @main_routes.route('/register', methods=['POST'])
@@ -285,5 +307,28 @@ def create_invoice():
     except SQLAlchemyError as e:
         db.session.rollback()
         return jsonify({'message': f'Error creating invoice: {str(e)}'}), 500
+
+
+# Beskyttet route for admin
+@main_routes.route('/admin/users', methods=['GET'])
+@token_required
+def get_all_users(current_user):
+    if current_user.role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 403
+    users = User.query.all()
+    return jsonify({'users': [u.serialize() for u in users]})
+
+@main_routes.route('/admin/users/<int:user_id>', methods=['DELETE'])
+@token_required
+def delete_user(current_user, user_id):
+    if current_user.role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 403
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'message': 'User deleted'}), 200
+
 
 
