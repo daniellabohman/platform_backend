@@ -17,7 +17,7 @@ def create_app():
     migrate.init_app(app, db)
 
     # Importing models inside the function to avoid circular imports
-    from app.models import User, Course, Booking, Feedback, Category
+    from app.models import User, Course, Booking, Notification, Category, Instructor
 
     # Apply migrations (only if necessary)
     with app.app_context():
