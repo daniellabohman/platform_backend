@@ -9,6 +9,7 @@ from app.models import db  # Import db from models.py (don't redefine it)
 # Initialize extensions (Migrate, CORS)
 migrate = Migrate()
 
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -28,7 +29,8 @@ def create_app():
         db.create_all()  
 
     # Enable CORS (Cross-Origin Resource Sharing)
-    CORS(app)
+    CORS(app, origins=["http://localhost:3000"], supports_credentials=True, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
 
     # Import blueprints and register them
     from app.routes import main_routes

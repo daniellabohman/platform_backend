@@ -9,8 +9,7 @@ from datetime import timedelta
 from functools import wraps
 from flask import request, jsonify
 from dotenv import load_dotenv
-import os
-import jwt
+
 
 # Indlæs miljøvariabler fra .env filen
 load_dotenv()
@@ -99,6 +98,28 @@ def login():
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
 
+@main_routes.route('/courses', methods=['GET'])
+def get_courses():
+    courses = Course.query.all()
+    course_list = []
+
+    for course in courses:
+        course_list.append({
+            "id": course.id,
+            "title": course.title,
+            "description": course.description,
+            "price": course.price,
+            "instructor": {
+                "id": course.instructor.id,
+                "username": course.instructor.username
+            }
+        })
+
+    return jsonify({"courses": course_list}), 200
+
+@app.route('/courses', methods=["OPTIONS"])
+def options_courses():
+    return '', 200  # Allow CORS preflight request for this endpoint
 
 # Book a course
 @main_routes.route('/book', methods=['POST'])
