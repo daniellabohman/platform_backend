@@ -13,15 +13,6 @@ from werkzeug.utils import secure_filename
 import os
 
 
-UPLOAD_FOLDER = '/path/to/profile_pics/'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
 #Indlæs miljøvariabler fra .env filen
 load_dotenv()
 
