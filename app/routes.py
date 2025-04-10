@@ -1,7 +1,7 @@
 import datetime
 from flask import Blueprint, jsonify, request, app
 from flask_login import login_required, current_user
-from app.models import db, User, Course, Booking, Notification, Subscription, Invoice, Category, Profile
+from app.models import db, User, Course, Booking, Notification, Subscription, Invoice, Category, Profile, Instructor
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import SQLAlchemyError
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required
@@ -9,9 +9,20 @@ from datetime import timedelta
 from functools import wraps
 from flask import request, jsonify
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
+import os
 
 
-# Indlæs miljøvariabler fra .env filen
+UPLOAD_FOLDER = '/path/to/profile_pics/'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+#Indlæs miljøvariabler fra .env filen
 load_dotenv()
 
 # Create Blueprint for routes
@@ -21,7 +32,7 @@ main_routes = Blueprint('main_routes', __name__)
 def home():
     return jsonify({'message': 'Backend is running'}), 200
 
-@main_routes.route('/About', methods=['GET'])
+@main_routes.route('/about', methods=['GET'])
 def about():
     return jsonify({'message': 'Backend is running'}), 200
 
@@ -117,7 +128,7 @@ def get_courses():
 
     return jsonify({"courses": course_list}), 200
 
-@app.route('/courses', methods=["OPTIONS"])
+@main_routes.route('/courses', methods=["OPTIONS"])
 def options_courses():
     return '', 200  # Allow CORS preflight request for this endpoint
 
@@ -352,4 +363,130 @@ def delete_user(current_user, user_id):
     return jsonify({'message': 'User deleted'}), 200
 
 
+@main_routes.route('/instructors', methods=['GET'])
+def get_instructors():
+    instructors = Instructor.query.all()  # Assuming you have an Instructor model
+    if not instructors:
+        return jsonify({'message': 'No instructors found'}), 404
 
+    instructors_list = []
+    for instructor in instructors:
+        instructors_list.append({
+            'id': instructor.id,
+            'user_id': instructor.user_id,
+            'bio': instructor.bio,
+            'expertise': instructor.expertise,
+            'rate': instructor.rate,
+            'profile_picture': instructor.profile_picture
+        })
+    
+    return jsonify({'instructors': instructors_list}), 200
+
+
+# Create a new instructor
+@main_routes.route('/instructors', methods=['POST'])
+def create_instructor():
+    data = request.get_json()
+
+    if not data or not all(k in data for k in ['user_id', 'bio', 'expertise', 'rate', 'profile_picture']):
+        return jsonify({'message': 'Missing required fields'}), 400
+
+    user_id = data['user_id']
+    bio = data['bio']
+    expertise = data['expertise']
+    rate = data['rate']
+    profile_picture = data['profile_picture']
+
+    # Make sure user_id exists (check if the user is registered)
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    new_instructor = Instructor(
+        user_id=user_id,
+        bio=bio,
+        expertise=expertise,
+        rate=rate,
+        profile_picture=profile_picture
+    )
+
+    try:
+        db.session.add(new_instructor)
+        db.session.commit()
+        return jsonify({'message': 'Instructor created successfully'}), 201
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({'message': str(e)}), 500
+
+
+# Update an instructor's information
+@main_routes.route('/instructors/<int:id>', methods=['PUT'])
+def update_instructor(id):
+    data = request.get_json()
+
+    instructor = Instructor.query.get(id)
+    if not instructor:
+        return jsonify({'message': 'Instructor not found'}), 404
+
+    # Update fields (you can choose to update only certain fields like bio, rate, etc.)
+    instructor.bio = data.get('bio', instructor.bio)
+    instructor.expertise = data.get('expertise', instructor.expertise)
+    instructor.rate = data.get('rate', instructor.rate)
+    instructor.profile_picture = data.get('profile_picture', instructor.profile_picture)
+
+    try:
+        db.session.commit()
+        return jsonify({'message': 'Instructor updated successfully'}), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({'message': str(e)}), 500
+
+
+# Delete an instructor
+@main_routes.route('/instructors/<int:id>', methods=['DELETE'])
+def delete_instructor(id):
+    instructor = Instructor.query.get(id)
+    if not instructor:
+        return jsonify({'message': 'Instructor not found'}), 404
+
+    try:
+        db.session.delete(instructor)
+        db.session.commit()
+        return jsonify({'message': 'Instructor deleted successfully'}), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({'message': str(e)}), 500
+
+
+# Utility function to check if the file is of an allowed type
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+
+# API Endpoint for uploading profile picture
+@main_routes.route('/upload_profile_picture', methods=['POST'])
+@login_required  # Ensures that only authenticated users can upload pictures
+def upload_profile_picture():
+    # Check if the file part exists in the request
+    if 'file' not in request.files:
+        return jsonify({'message': 'No file part'}), 400
+    
+    file = request.files['file']
+    
+    # If no file is selected, return error
+    if file.filename == '':
+        return jsonify({'message': 'No selected file'}), 400
+    
+    # If the file is allowed, save it
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)  # Secure the filename
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)  # Construct the full file path
+        file.save(file_path)  # Save the file to the defined folder
+        
+        # Save the file path in the database for the current instructor
+        instructor = Instructor.query.get(current_user.id)  # Assuming `current_user.id` is the logged-in instructor
+        instructor.profile_picture = f'{request.host_url}static/profile_pics/{filename}'  # URL for the image
+        db.session.commit()
+
+        return jsonify({'message': 'Profile picture uploaded successfully', 'url': f'http://localhost:5000/profile_pics/{filename}'}), 200
+    else:
+        return jsonify({'message': 'Invalid file type. Only PNG, JPG, JPEG, GIF are allowed.'}), 400

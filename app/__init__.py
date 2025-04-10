@@ -4,15 +4,22 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import Config
-from app.models import db  # Import db from models.py (don't redefine it)
+from app.models import db  
 
 # Initialize extensions (Migrate, CORS)
 migrate = Migrate()
+
+import os
+
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'profile_pics')  # Relative path to 'profile_pics' folder
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}  # Allowed image extensions
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limit file size to 16MB
 
     # Initialize database and migrations
     db.init_app(app)  

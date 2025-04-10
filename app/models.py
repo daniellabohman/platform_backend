@@ -29,14 +29,28 @@ class User(db.Model):
     invoices = db.relationship('Invoice', backref='user', lazy=True)
     instructor = db.relationship('Instructor', uselist=False, back_populates='user', lazy=True) # One-to-one relation
 
-#Instruktor model
 class Instructor(db.Model):
     __tablename__ = 'instructors'
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    bio = db.Column(db.Text, nullable=True)
-    expertise = db.Column(db.String(255), nullable=True)
+    bio = db.Column(db.Text, nullable=True)  # Description about the instructor
+    expertise = db.Column(db.String(255), nullable=True)  # Area of expertise
+    rate = db.Column(db.Float, nullable=True)  # The rate of the instructor (e.g., per hour)
+    profile_picture = db.Column(db.String(255), nullable=True)  # URL to profile picture
+
+    # Relationship with the User model
     user = db.relationship('User', foreign_keys=[user_id], back_populates='instructor', lazy=True)
+
+    def __init__(self, user_id, bio, expertise, rate, profile_picture):
+        self.user_id = user_id
+        self.bio = bio
+        self.expertise = expertise
+        self.rate = rate
+        self.profile_picture = profile_picture
+
+    def __repr__(self):
+        return f"<Instructor(id={self.id}, user_id={self.user_id}, rate={self.rate})>"
 
 # Profile model for customers and instructors
 class Profile(db.Model):
