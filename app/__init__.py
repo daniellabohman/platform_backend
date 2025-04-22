@@ -36,7 +36,7 @@ def create_app():
         db.create_all()  
 
     # Enable CORS (Cross-Origin Resource Sharing)
-    CORS(app, origins=["http://localhost:3000"], supports_credentials=True, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+    CORS(app, origins=["http://localhost:3000", "http://localhost:3001"], supports_credentials=True, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 
     # Import blueprints and register them

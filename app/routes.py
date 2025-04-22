@@ -1,7 +1,7 @@
 import datetime
 from flask import Blueprint, jsonify, request, app
 from flask_login import login_required, current_user
-from app.models import db, User, Course, Booking, Notification, Subscription, Invoice, Category, Profile, Instructor
+from app.models import db, User, Course, Booking, Notification, Subscription, Invoice, Category, Profile, Instructor, InvoiceTemplateSetting
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import SQLAlchemyError
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required
@@ -82,21 +82,34 @@ def register():
         return jsonify({'message': str(e)}), 500
 
 
-# Login route
-@main_routes.route('/login', methods=['POST'])
+#@main_routes.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
 
+    # Tjek for nødvendige felter i request body
     if not data or not all(k in data for k in ['email', 'password']):
         return jsonify({'message': 'Missing required fields'}), 400
 
     email = data['email']
     password = data['password']
 
+    # Find brugeren i databasen
     user = User.query.filter_by(email=email).first()
+
+    # Hvis brugeren findes, og password er korrekt
     if user and check_password_hash(user.password_hash, password):
+        # Opret en JWT token
         token = create_access_token(identity=user.id)
-        return jsonify({'message': 'Login successful', 'access_token': token}), 200
+        
+        # Tjek om brugeren er en admin
+        is_admin = user.role == 'admin'
+
+        # Returner token og isAdmin flag
+        return jsonify({
+            'message': 'Login successful',
+            'access_token': token,
+            'isAdmin': is_admin  # Tilføj isAdmin info
+        }), 200
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
 
@@ -304,23 +317,37 @@ def get_subscriptions(user_id):
 def create_invoice():
     data = request.get_json()
 
-    if not data or not all(k in data for k in ['booking_id', 'amount', 'status', 'due_date']):
+    # Ensure the required fields are included
+    required_fields = ['invoice_number', 'due_date', 'vat_amount', 'cvr_number', 'ean_number', 
+                       'payment_method', 'bank_account', 'note', 'pdf_url', 'user_id']
+
+    if not data or not all(field in data for field in required_fields):
         return jsonify({'message': 'Missing required fields'}), 400
 
-    booking_id = data['booking_id']
-    amount = data['amount']
-    status = data['status']
+    # Extract data from request
+    invoice_number = data['invoice_number']
     due_date = data['due_date']
+    vat_amount = data['vat_amount']
+    cvr_number = data['cvr_number']
+    ean_number = data['ean_number']
+    payment_method = data['payment_method']
+    bank_account = data['bank_account']
+    note = data['note']
+    pdf_url = data['pdf_url']
+    user_id = data['user_id']
 
-    booking = Booking.query.get(booking_id)
-    if not booking:
-        return jsonify({'message': 'Booking not found'}), 404
-
+    # Create the invoice object
     new_invoice = Invoice(
-        booking_id=booking_id,
-        amount=amount,
-        status=status,
-        due_date=due_date
+        invoice_number=invoice_number,
+        due_date=due_date,
+        vat_amount=vat_amount,
+        cvr_number=cvr_number,
+        ean_number=ean_number,
+        payment_method=payment_method,
+        bank_account=bank_account,
+        note=note,
+        pdf_url=pdf_url,
+        user_id=user_id  # Assuming invoice is tied to a user
     )
 
     try:
@@ -330,6 +357,67 @@ def create_invoice():
     except SQLAlchemyError as e:
         db.session.rollback()
         return jsonify({'message': f'Error creating invoice: {str(e)}'}), 500
+    
+   
+@main_routes.route('/invoices/<int:invoice_id>', methods=['PUT'])
+def update_invoice(invoice_id):
+    data = request.get_json()
+
+    invoice = Invoice.query.get(invoice_id)
+    if not invoice:
+        return jsonify({'message': 'Invoice not found'}), 404
+
+    # Update invoice fields
+    invoice.invoice_number = data.get('invoice_number', invoice.invoice_number)
+    invoice.due_date = data.get('due_date', invoice.due_date)
+    invoice.vat_amount = data.get('vat_amount', invoice.vat_amount)
+    invoice.cvr_number = data.get('cvr_number', invoice.cvr_number)
+    invoice.ean_number = data.get('ean_number', invoice.ean_number)
+    invoice.payment_method = data.get('payment_method', invoice.payment_method)
+    invoice.bank_account = data.get('bank_account', invoice.bank_account)
+    invoice.note = data.get('note', invoice.note)
+
+    try:
+        db.session.commit()
+        return jsonify({'message': 'Invoice updated successfully'}), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({'message': f'Error updating invoice: {str(e)}'}), 500
+
+    
+#Invoice table settings
+@main_routes.route('/invoice-template-settings', methods=['POST'])
+def create_invoice_template_settings():
+    data = request.get_json()
+
+    # Ensure required fields for template settings
+    required_fields = ['user_id', 'logo_url', 'custom_text', 'color_theme', 'font_style']
+
+    if not data or not all(field in data for field in required_fields):
+        return jsonify({'message': 'Missing required fields'}), 400
+
+    user_id = data['user_id']
+    logo_url = data['logo_url']
+    custom_text = data['custom_text']
+    color_theme = data['color_theme']
+    font_style = data['font_style']
+
+    # Create new template settings
+    new_settings = InvoiceTemplateSetting(
+        user_id=user_id,
+        logo_url=logo_url,
+        custom_text=custom_text,
+        color_theme=color_theme,
+        font_style=font_style
+    )
+
+    try:
+        db.session.add(new_settings)
+        db.session.commit()
+        return jsonify({'message': 'Invoice template settings created successfully'}), 201
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({'message': f'Error creating template settings: {str(e)}'}), 500
 
 
 # Beskyttet route for admin

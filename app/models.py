@@ -18,6 +18,8 @@ class User(db.Model):
     phone_number = db.Column(db.String(20), nullable=True)
     is_instructor = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reg_number = db.Column(db.String(20), nullable=True)
+    account_number = db.Column(db.String(50), nullable=True)
     # JWT Authentication Token (for login)
     auth_token = db.Column(db.String(255), nullable=True)
     # Subscription info
@@ -28,6 +30,8 @@ class User(db.Model):
     bookings = db.relationship('Booking', backref='user', lazy=True)
     invoices = db.relationship('Invoice', backref='user', lazy=True)
     instructor = db.relationship('Instructor', uselist=False, back_populates='user', lazy=True) # One-to-one relation
+    invoice_template = db.relationship('InvoiceTemplateSetting', backref='user', uselist=False, lazy=True)
+
 
 class Instructor(db.Model):
     __tablename__ = 'instructors'
@@ -97,7 +101,6 @@ class Booking(db.Model):
     # Adding fields for calendar sync (Google Calendar integration)
     google_calendar_event_id = db.Column(db.String(255), nullable=True)
 
-# Invoice model (for payments)
 class Invoice(db.Model):
     __tablename__ = 'invoices'
     id = db.Column(db.Integer, primary_key=True)
@@ -107,9 +110,28 @@ class Invoice(db.Model):
     status = db.Column(db.String(50), nullable=False)  # 'paid', 'unpaid'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Relationships
+    # Nye felter:
+    invoice_number = db.Column(db.String(50), unique=True, nullable=False)
+    due_date = db.Column(db.DateTime, nullable=False)
+    vat_amount = db.Column(db.Float, nullable=False)
+    cvr_number = db.Column(db.String(20), nullable=True)
+    ean_number = db.Column(db.String(20), nullable=True)
+    payment_method = db.Column(db.String(50), nullable=True)
+    bank_account = db.Column(db.String(50), nullable=True)
+    note = db.Column(db.Text, nullable=True)
+    pdf_url = db.Column(db.String(255), nullable=True)
+
     booking = db.relationship('Booking', backref='invoice')
 
+class InvoiceTemplateSetting(db.Model):
+    __tablename__ = 'invoice_template_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    logo_url = db.Column(db.String(255), nullable=True)
+    custom_text = db.Column(db.Text, nullable=True)
+    color_theme = db.Column(db.String(20), nullable=True)
+    font_style = db.Column(db.String(50), nullable=True)
+    
 # Notification model for users
 class Notification(db.Model):
     __tablename__ = 'notifications'
